@@ -1,8 +1,12 @@
 /*
   UVKEYSAN Control Software
-  V0.0.1
+  V0.0.2
+
+  tone() added to drive buzzer.
+  photo diode disabled
+
   Paul Kuzan
-  15/07/202
+  02/08/202
 */
 
 #include <Bounce2.h>
@@ -90,16 +94,13 @@ void doStateMachine() {
     case STATE_STANDBY: {
         if (justTransitioned) {
           transitionLEDState(STATE_LED_OFF);
-          digitalWrite(UVPin, HIGH);
-          digitalWrite(buzzerPin, LOW);
+          turnOffUVLedAndBuzzer();
           justTransitioned = false;
         }
 
         if (switchState == SWITCH_PRESS_SHORT) {
           switchState = SWITCH_NONE;
-          if (shieldState == SHIELD_DARK) {
-            transitionTo(STATE_ON);
-          }
+          transitionTo(STATE_ON);
         }
         break;
       }
@@ -108,11 +109,11 @@ void doStateMachine() {
         if (justTransitioned) {
           stopTime = millis() + runTime;
           transitionLEDState(STATE_LED_FLASH_FAST);
-          digitalWrite(buzzerPin, HIGH);
+          buzzer(true);
           digitalWrite(UVPin, LOW);
           justTransitioned = false;
         }
-        if ((millis() > stopTime) || (shieldState == SHIELD_LIGHT) || (switchState == SWITCH_PRESS_SHORT)) {
+        if ((millis() > stopTime) || (switchState == SWITCH_PRESS_SHORT)) {
           transitionTo(STATE_STANDBY);
         }
         break;
@@ -120,6 +121,7 @@ void doStateMachine() {
     case STATE_SETUP: {
         if (justTransitioned) {
           transitionLEDState(STATE_LED_FLASH_SLOW);
+          turnOffUVLedAndBuzzer();
           justTransitioned = false;
         }
 
@@ -155,7 +157,7 @@ void readPhotoDiodes() {
   int diode_internal = analogRead(photo_diode_internal);
   int diode_external = analogRead(photo_diode_external);
 
-  if (diode_internal < 8 ) {
+  if (diode_internal < 5 ) {
     shieldState = SHIELD_DARK;
     digitalWrite(ledPinOrange, HIGH);
   } else {
@@ -236,4 +238,17 @@ void updateLED(bool newLEDFlashState) {
 void transitionLEDState(byte newLEDState) {
   ledStateJustTransitioned = true;
   ledState = newLEDState;
+}
+
+void buzzer(bool state) {
+  if (state) {
+    tone(buzzerPin, 2500);
+  } else {
+    noTone();
+  }
+}
+
+void turnOffUVLedAndBuzzer() {
+  digitalWrite(UVPin, HIGH);
+  buzzer(false);
 }
