@@ -51,5 +51,7 @@ Search for `tone`, select the library and press the Install button.
 |GND                 |             |14            |       |
 
 
-![ATTiny84 Pinout][attiny84-pins.jpg]
+![ATTiny84 Pinout](attiny84-pins.jpg)
+
+![Schematic](UV Controller.pdf)
 
