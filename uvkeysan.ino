@@ -1,12 +1,12 @@
 /*
   UVKEYSAN Control Software
-  V0.0.2
+  V0.0.3
 
   tone() added to drive buzzer.
-  photo diode disabled
+  photo diode support added
 
   Paul Kuzan
-  02/08/202
+  30/04/2021
 */
 
 #include <Bounce2.h>
@@ -26,6 +26,14 @@
 #define STATE_LED_ON 2
 #define STATE_LED_FLASH_SLOW 3
 #define STATE_LED_FLASH_FAST 4
+
+////////CHANGE ME////////
+//Set threashold to -1 to disable sensor, it will default to dark
+const int photoDiodeInternalThreashold = -1;
+const int photoDiodeExternalThreashold = 20;
+const int photoDiodeHysteresis = 5;
+const unsigned long runTime = 10000UL;
+/////////////////////////
 
 bool justTransitioned = false;
 bool ledStateJustTransitioned = false;
@@ -53,16 +61,13 @@ unsigned long switchPressTime = 0;
 volatile byte switchState = SWITCH_NONE;
 bool switchPressed = false;
 
-const unsigned long runTime = 10000UL;
 unsigned long stopTime = 0;
 
 volatile byte ledState;
 volatile byte state;
-volatile byte shieldState;
+volatile byte shieldState = SHIELD_LIGHT;
 
 void setup() {
-  analogReference(EXTERNAL);
-
   pinMode( switchPin, INPUT_PULLUP);
   onOffSwitch.attach(switchPin);
 
@@ -83,6 +88,7 @@ void loop() {
   readSwitch();
   doStateMachine();
   doLEDStateMachine();
+  delay(50);
 }
 
 void doStateMachine() {
@@ -100,7 +106,9 @@ void doStateMachine() {
 
         if (switchState == SWITCH_PRESS_SHORT) {
           switchState = SWITCH_NONE;
-          transitionTo(STATE_ON);
+          if (shieldState == SHIELD_DARK) {
+            transitionTo(STATE_ON);
+          }
         }
         break;
       }
@@ -113,8 +121,9 @@ void doStateMachine() {
           digitalWrite(UVPin, LOW);
           justTransitioned = false;
         }
-        if ((millis() > stopTime) || (switchState == SWITCH_PRESS_SHORT)) {
-          transitionTo(STATE_STANDBY);
+
+        if((millis() > stopTime) || (switchState == SWITCH_PRESS_SHORT) || (shieldState == SHIELD_LIGHT) ){
+             transitionTo(STATE_STANDBY);
         }
         break;
       }
@@ -157,7 +166,22 @@ void readPhotoDiodes() {
   int diode_internal = analogRead(photo_diode_internal);
   int diode_external = analogRead(photo_diode_external);
 
-  if (diode_internal < 5 ) {
+  boolean internalDark = false;
+  boolean externalDark = false;
+
+  if ((photoDiodeExternalThreashold == -1) || (diode_external < photoDiodeExternalThreashold)) {
+    externalDark = true;
+  } else if (diode_external > photoDiodeExternalThreashold + photoDiodeHysteresis) {
+    externalDark = false;
+  }
+
+  if ((photoDiodeInternalThreashold == -1) || (diode_internal < photoDiodeInternalThreashold )) {
+    internalDark = true;
+  } else if (diode_internal > photoDiodeInternalThreashold + photoDiodeHysteresis) {
+    internalDark = false;
+  }
+
+  if (internalDark && externalDark) {
     shieldState = SHIELD_DARK;
     digitalWrite(ledPinOrange, HIGH);
   } else {
